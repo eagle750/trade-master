@@ -1,0 +1,47 @@
+.card {
+  padding: 12px 14px;
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.note {
+  font-size: var(--text-tiny);
+  color: var(--text-tertiary);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tile {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+.tileLabel {
+  margin-bottom: 4px;
+}
+
+.tileAmount {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-medium);
+  line-height: 1.2;
+}
+
+.positive { color: var(--up-dark); }
+.negative { color: var(--down); }
+.empty    { color: var(--text-tertiary); }
+
+.tileSubtext {
+  font-size: var(--text-tiny);
+  color: var(--text-tertiary);
+  margin-top: 3px;
+}

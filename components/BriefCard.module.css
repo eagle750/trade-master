@@ -1,0 +1,77 @@
+.card { padding: 14px; }
+
+.header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: var(--text-h4);
+  font-weight: var(--weight-medium);
+  color: var(--brand-darkest);
+}
+
+.actions { margin-left: auto; }
+
+.list {
+  list-style: none;
+  counter-reset: brief;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+}
+
+.bullet {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--text-body);
+  line-height: 1.5;
+  counter-increment: brief;
+}
+
+.bullet::before {
+  content: counter(brief);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: var(--text-tiny);
+  font-weight: var(--weight-medium);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.stageLabel {
+  font-weight: var(--weight-medium);
+  color: var(--brand-darker);
+  flex-shrink: 0;
+}
+
+.bulletText {
+  color: var(--brand-darkest);
+  flex: 1;
+}
+
+.citation {
+  margin-left: 5px;
+  font-size: 9px;
+  padding: 0 4px;
+  cursor: pointer;
+  vertical-align: 2px;
+}
+
+.editInput {
+  width: 100%;
+  font-size: var(--text-body);
+  line-height: 1.5;
+  resize: vertical;
+}

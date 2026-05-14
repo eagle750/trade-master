@@ -1,0 +1,71 @@
+.wrap { margin-top: 4px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.card {
+  background: var(--bg-primary);
+  border: 0.5px solid var(--border-tertiary);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: relative;
+}
+.card:hover { border-color: var(--brand); background: var(--brand-bg); }
+
+.rank {
+  font-size: var(--text-tiny);
+  font-weight: var(--weight-medium);
+  color: var(--brand);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.symbol {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.name {
+  font-size: var(--text-tiny);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metric {
+  font-size: var(--text-caption);
+  margin-top: 4px;
+}
+.metricLabel { color: var(--text-secondary); font-size: var(--text-tiny); }
+.positive { color: var(--up-dark); font-weight: var(--weight-medium); }
+.negative { color: var(--down);    font-weight: var(--weight-medium); }
+
+.meta {
+  font-size: var(--text-tiny);
+  color: var(--text-tertiary);
+}
+
+.weight {
+  font-size: var(--text-tiny);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+@media (max-width: 900px) {
+  .grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 600px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}

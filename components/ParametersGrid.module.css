@@ -1,0 +1,126 @@
+.card { padding: 14px; }
+
+.header { margin-bottom: 12px; }
+
+.title {
+  font-size: var(--text-h4);
+  font-weight: var(--weight-medium);
+}
+
+.warningBanner {
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.box {
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--border-tertiary);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.boxHeader {
+  margin-bottom: 10px;
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldMissing .fieldLabel {
+  color: var(--caution-dark);
+}
+
+.fieldRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.fieldInput {
+  font-size: var(--text-body);
+  padding: 5px 8px;
+  height: 30px;
+}
+
+.currencyWrap {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 0.5px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.currencyPrefix {
+  padding: 5px 8px;
+  font-size: var(--text-body);
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-right: 0.5px solid var(--border-secondary);
+}
+
+.currencyInput {
+  flex: 1;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.unitWrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.unit {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.helpText {
+  font-size: var(--text-tiny);
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: var(--text-body);
+}
+
+.toggleLabel {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .grid { grid-template-columns: 1fr; }
+}

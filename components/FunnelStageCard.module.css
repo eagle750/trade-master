@@ -1,0 +1,83 @@
+.card {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 0.5px solid var(--border-tertiary);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  cursor: pointer;
+  transition: border-color 150ms, background 150ms;
+  position: relative;
+  min-width: 0;
+}
+.card:hover { border-color: var(--border-primary); }
+
+.active {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.barTrack {
+  height: 3px;
+  background: var(--bg-secondary);
+  border-radius: 1px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--brand);
+  border-radius: 1px;
+  transition: width 600ms ease-out;
+}
+
+.stageLabel { margin-bottom: 2px; }
+
+.stageName {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.count {
+  font-size: var(--text-h3);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.delta {
+  font-size: var(--text-tiny);
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.status {
+  margin-top: 6px;
+  font-size: var(--text-tiny);
+}
+
+.statusVerified {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--up-dark);
+}
+
+.statusInspecting {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--brand);
+}
+
+.statusPending { color: var(--text-tertiary); }
+
+.running {
+  color: var(--text-tertiary);
+  margin: 8px 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }

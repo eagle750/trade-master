@@ -1,0 +1,138 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.header { display: flex; flex-direction: column; gap: 4px; }
+
+.title {
+  font-size: var(--text-h4);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+.sub {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+/* File badge — shown after upload */
+.fileBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  background: var(--brand-bg);
+  border: 0.5px solid var(--brand-border);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  color: var(--brand-darker);
+  align-self: flex-start;
+}
+
+.fileRemove {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--brand-darker);
+  padding: 0;
+  margin-left: 2px;
+}
+.fileRemove:hover { color: var(--down); }
+
+/* Textarea wrapper with drag-over state */
+.textareaWrap {
+  position: relative;
+  border-radius: var(--radius-md);
+  transition: border-color 150ms;
+}
+
+.dragOver .textarea,
+.dragOver {
+  border: 1.5px dashed var(--brand) !important;
+  background: var(--brand-bg) !important;
+}
+
+.dragHint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--brand-bg);
+  border-radius: var(--radius-md);
+  color: var(--brand);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.extracting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 108px;
+  color: var(--text-secondary);
+  font-size: var(--text-body);
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 108px;
+  font-size: var(--text-body);
+  line-height: 1.6;
+  width: 100%;
+}
+
+.charRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.charCount { font-size: var(--text-tiny); color: var(--text-tertiary); }
+.charOver  { color: var(--caution-dark); }
+.capNote   { font-size: var(--text-tiny); color: var(--text-tertiary); }
+
+.chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tryLink { font-size: var(--text-caption); margin-left: 2px; }
+
+.uploadBtn {
+  margin-left: auto;
+  border-style: dashed !important;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 0.5px solid var(--border-tertiary);
+}
+
+.tooShort {
+  font-size: var(--text-caption);
+  color: var(--caution-dark);
+}
+
+.spacer { flex: 1; }
+.parseBtn { min-width: 96px; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }

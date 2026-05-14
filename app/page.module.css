@@ -1,0 +1,49 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  overflow-x: hidden;
+}
+
+.bannerWrap,
+.sectorBannerWrap {
+  padding-top: 8px;
+}
+
+.main {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 12px;
+  padding-top: 12px;
+  padding-bottom: 0;
+  align-items: start;
+}
+
+.leftCol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  /* News rail height matches left column height naturally in the grid */
+}
+
+.filterSection {
+  margin-top: 12px;
+  padding-bottom: 16px;
+}
+
+@media (max-width: 768px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .rightCol {
+    position: static;
+    max-height: none;
+  }
+}

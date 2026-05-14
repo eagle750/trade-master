@@ -1,0 +1,64 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px;
+  background: var(--bg-primary);
+  border: 0.5px solid var(--border-tertiary);
+  border-radius: var(--radius-lg);
+  margin-bottom: 10px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.left { display: flex; align-items: center; gap: 12px; }
+
+.avatar {
+  width: 40px; height: 40px;
+  background: var(--brand-bg);
+  border-radius: var(--radius-md);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: var(--weight-medium);
+  font-size: var(--text-caption);
+  color: var(--brand);
+  flex-shrink: 0;
+}
+
+.symbolRow {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
+}
+
+.symbol {
+  font-size: var(--text-h2);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.livePill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px; border-radius: var(--radius-pill);
+  background: var(--up-bg); color: var(--up-dark);
+  font-size: var(--text-tiny); font-weight: var(--weight-medium);
+}
+
+.name {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+.right { display: flex; align-items: center; gap: 16px; }
+
+.priceBlock { text-align: right; }
+
+.ltp {
+  font-size: var(--text-h2);
+  font-weight: var(--weight-medium);
+  line-height: 1.2;
+}
+
+.change { font-size: var(--text-caption); margin-top: 2px; }
+.up   { color: var(--up-dark); }
+.down { color: var(--down); }
+
+.actions { display: flex; gap: 6px; }

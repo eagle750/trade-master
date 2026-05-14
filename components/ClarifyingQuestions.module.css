@@ -1,0 +1,136 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 80px; /* room for sticky bar */
+}
+
+.progressStrip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.progressLabel {
+  font-size: var(--text-caption);
+  color: var(--brand-darker);
+}
+
+.progressBar { width: 100%; }
+
+.escapeBanner {
+  font-size: var(--text-caption);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.questionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  transition: border-color 150ms;
+}
+
+.answered {
+  border-color: var(--up-border);
+  background: var(--up-bg);
+}
+
+.qHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.qNum {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.checkIcon {
+  margin-left: auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--up-bg);
+  color: var(--up-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.questionText {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.whyAsk {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.whyLabel {
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.highlight {
+  background: rgba(226, 163, 60, 0.25);
+  border-radius: 2px;
+  padding: 0 2px;
+  font-style: normal;
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.customInput {
+  width: 88px;
+  font-size: var(--text-caption);
+  padding: 5px 8px;
+}
+
+.skipLink {
+  color: var(--text-tertiary);
+  font-size: var(--text-tiny);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  align-self: flex-start;
+}
+
+.stickyBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 32px;
+  background: var(--bg-primary);
+  border-top: 0.5px solid var(--border-tertiary);
+  z-index: 50;
+}
+
+.pendingNote {
+  font-size: var(--text-caption);
+  color: var(--text-secondary);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }

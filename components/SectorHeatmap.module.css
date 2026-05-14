@@ -1,0 +1,46 @@
+.card {
+  padding: 12px 14px;
+}
+
+.header {
+  margin-bottom: 10px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.cell {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 52px;
+  padding: 8px 10px;
+  border: 0.5px solid var(--border-tertiary);
+  border-radius: var(--radius-md);
+  transition: filter 120ms;
+  box-sizing: border-box;
+}
+.cell:hover { filter: brightness(0.94); }
+
+.sectorName {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+}
+
+.sectorPct {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  margin-top: 4px;
+}
+
+.empty {
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
+  padding: 12px 0 4px;
+  font-style: italic;
+}

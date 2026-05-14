@@ -1,0 +1,46 @@
+.card {
+  background: var(--bg-primary);
+  border: 0.5px solid var(--border-tertiary);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  margin-bottom: 8px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.symbolLabel { flex-shrink: 0; }
+
+.tfPills {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.tfBtn {
+  font-size: var(--text-tiny) !important;
+  padding: 3px 7px !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-secondary);
+}
+
+.tfActive {
+  background: var(--brand-bg) !important;
+  color: var(--brand) !important;
+  font-weight: var(--weight-medium) !important;
+}
+
+.footer52w {
+  display: flex;
+  gap: 16px;
+  margin-top: 6px;
+  font-size: var(--text-tiny);
+  color: var(--text-secondary);
+  padding-top: 6px;
+  border-top: 0.5px solid var(--border-tertiary);
+}

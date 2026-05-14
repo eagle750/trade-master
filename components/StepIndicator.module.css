@@ -1,0 +1,67 @@
+.bar {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  gap: 0;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-tiny);
+  font-weight: var(--weight-medium);
+  background: var(--bg-secondary);
+  color: var(--text-tertiary);
+  border: 0.5px solid var(--border-secondary);
+  flex-shrink: 0;
+  transition: background 200ms, color 200ms;
+}
+
+.dotActive {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
+.dotDone {
+  background: var(--up-bg);
+  color: var(--up-dark);
+  border-color: var(--up-border);
+}
+
+.label {
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
+  font-weight: var(--weight-regular);
+  white-space: nowrap;
+}
+
+.labelActive {
+  color: var(--brand);
+  font-weight: var(--weight-medium);
+}
+
+.labelDone {
+  color: var(--text-secondary);
+}
+
+.line {
+  width: 40px;
+  height: 0.5px;
+  background: var(--border-secondary);
+  margin: 0 8px;
+}
+
+.lineDone {
+  background: var(--up-border);
+}

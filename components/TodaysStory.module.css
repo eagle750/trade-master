@@ -1,0 +1,51 @@
+.card {
+  display: flex;
+  background: var(--brand-bg);
+  border: 0.5px solid var(--brand-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  min-height: 88px;
+}
+
+.accent {
+  width: 3px;
+  flex-shrink: 0;
+  background: var(--brand);
+}
+
+.content {
+  flex: 1;
+  padding: 12px 14px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.time {
+  margin-left: auto;
+  font-size: var(--text-tiny);
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+}
+
+.body {
+  font-size: var(--text-body);
+  color: var(--brand-darkest);
+  line-height: 1.5;
+}
+
+.skeletonBlock {
+  padding-top: 4px;
+}
+
+.empty {
+  font-size: var(--text-body);
+  color: var(--text-tertiary);
+  font-style: italic;
+}

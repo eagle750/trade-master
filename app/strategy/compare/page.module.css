@@ -1,0 +1,64 @@
+.page { min-height: 100vh; background: var(--bg-secondary); display: flex; flex-direction: column; }
+.inner { flex: 1; padding: 20px 0 32px; }
+
+.breadcrumb { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; font-size: var(--text-caption); color: var(--text-secondary); }
+.breadSep { color: var(--text-tertiary); }
+
+.pageHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.title { font-size: var(--text-h2); font-weight: var(--weight-medium); }
+.headerActions { display: flex; gap: 6px; }
+
+.summaryGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+.summaryCard { padding: 14px; }
+.strategyLabel { font-size: var(--text-caption); font-weight: var(--weight-medium); margin-bottom: 6px; }
+.labelA { color: var(--brand); }
+.labelB { color: #009688; }
+.strategyDesc { font-size: var(--text-body); color: var(--text-secondary); margin-bottom: 10px; }
+.statsRow { display: flex; gap: 16px; }
+.statCell { display: flex; flex-direction: column; gap: 3px; }
+.statVal { font-size: var(--text-h3); font-weight: var(--weight-medium); }
+.positive { color: var(--up-dark); }
+.runningMsg { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: var(--text-body); padding: 8px 0; }
+
+.section { margin-bottom: 10px; padding: 14px; }
+
+/* Metrics */
+.metricRow { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 0.5px solid var(--border-tertiary); }
+.metricRow:last-of-type { border-bottom: none; }
+.metricLabel { font-size: var(--text-caption); color: var(--text-secondary); }
+.metricValues { display: flex; align-items: center; gap: 12px; }
+.metricVal { font-size: var(--text-caption); font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.winner { color: var(--up-dark); font-weight: var(--weight-medium); }
+.metricDivider { font-size: var(--text-tiny); color: var(--text-tertiary); }
+.perfNote { font-size: var(--text-tiny); color: var(--text-tertiary); margin-top: 10px; font-style: italic; }
+
+/* Overlap */
+.overlapGrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.overlapCell { border-radius: var(--radius-md); padding: 12px; }
+.overlapA    { background: var(--brand-bg); border: 0.5px solid var(--brand-border); }
+.overlapBoth { background: var(--bg-secondary); border: 0.5px solid var(--border-secondary); }
+.overlapB    { background: #E0F2F1; border: 0.5px solid #B2DFDB; }
+.overlapCount { font-size: var(--text-h2); font-weight: var(--weight-medium); line-height: 1; }
+.overlapLabel { font-size: var(--text-tiny); color: var(--text-secondary); margin: 3px 0 6px; }
+.overlapTickers { display: flex; flex-wrap: wrap; gap: 4px; }
+.ticker { font-size: var(--text-tiny); font-family: var(--font-mono); background: rgba(0,0,0,0.05); padding: 1px 5px; border-radius: 3px; }
+.more { font-size: var(--text-tiny); color: var(--text-tertiary); }
+
+/* Sector tilt */
+.sectorTable { display: flex; flex-direction: column; gap: 8px; }
+.sectorRow { display: flex; align-items: center; gap: 12px; }
+.sectorName { font-size: var(--text-caption); color: var(--text-secondary); min-width: 100px; }
+.sectorBars { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.barWrap { display: flex; align-items: center; gap: 6px; height: 10px; }
+.barA { height: 8px; background: var(--brand); border-radius: 2px; min-width: 2px; transition: width 400ms; }
+.barB { height: 8px; background: #009688; border-radius: 2px; min-width: 2px; transition: width 400ms; }
+.barLabel { font-size: var(--text-tiny); color: var(--text-secondary); min-width: 30px; }
+.sectorLegend { display: flex; gap: 16px; margin-top: 8px; font-size: var(--text-tiny); }
+.legendA { color: var(--brand); }
+.legendB { color: #009688; }
+
+/* Footer */
+.footerActions { display: flex; align-items: center; gap: 8px; padding: 14px; background: var(--bg-primary); border: 0.5px solid var(--border-tertiary); border-radius: var(--radius-lg); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }
