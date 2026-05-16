@@ -26,7 +26,7 @@ export default function MarketPulsePage() {
   const [data, setData]                 = useState<MarketPulseData | null>(null);
   const [fetchError, setFetchError]     = useState<string | null>(null);
   const [sectorFilter, setSectorFilter] = useState<string | undefined>();
-  const { status, time }                = getMarketStatus();
+  const { status, time, reason }        = getMarketStatus();
 
   const fetchData = useCallback(async () => {
     try {
@@ -60,6 +60,7 @@ export default function MarketPulsePage() {
       <GlobalNav
         marketStatus={data?.marketStatus ?? status}
         marketStatusTime={data?.marketStatusTime ?? time}
+        marketStatusReason={reason}
       />
 
       {/* API / data error banner */}

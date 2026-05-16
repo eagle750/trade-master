@@ -151,7 +151,7 @@ export default function StockPage({ params }: { params: Promise<{ symbol: string
 
   const toggleInd = (id: string) => setActiveInds((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const { status } = getMarketStatus();
+  const { status, reason: marketReason } = getMarketStatus();
   const stock = data ?? emptyStock(symbol);
   const [inWatchlist, setInWatchlist] = useState(false);
   const [wlPickerOpen, setWlPickerOpen] = useState(false);
@@ -182,7 +182,7 @@ export default function StockPage({ params }: { params: Promise<{ symbol: string
 
   return (
     <div className={styles.page}>
-      <GlobalNav marketStatus={status} marketStatusTime={new Date().toISOString()} />
+      <GlobalNav marketStatus={status} marketStatusTime={new Date().toISOString()} marketStatusReason={marketReason} />
 
       <div className={'page-container ' + styles.inner}>
         {/* ─── Stock header ─── */}
