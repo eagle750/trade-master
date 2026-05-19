@@ -16,6 +16,7 @@ import NewsRail from '@/components/NewsRail';
 import DisclaimerFooter from '@/components/DisclaimerFooter';
 import { getMarketStatus } from '@/lib/marketStatus';
 import { formatPrice, formatMcap, formatPct, formatDate } from '@/lib/format';
+import { rsi } from '@/lib/indicators';
 import type { StockOverviewData } from '@/app/api/stock/[symbol]/route';
 import { getWatchlists, addToWatchlist, isInAnyWatchlist, createWatchlist } from '@/lib/watchlist';
 import type { BacktestResult, TickState, TradeEvent } from '@/lib/backtestEngine';
@@ -468,7 +469,7 @@ export default function StockPage({ params }: { params: Promise<{ symbol: string
         {/* ════════════════════════════════════════════════
             LIVE TRADING TAB — Screen 11
             ════════════════════════════════════════════════ */}
-        {tab === 'live' && <LiveTradingTab symbol={symbol} />}
+        {tab === 'live' && <LiveTradingTab symbol={symbol} rsiPeriod={btConfig.rsiPeriod} threshold={btConfig.threshold} capital={btConfig.capital} />}
 
         {/* Stub tabs */}
         {tab === 'fundamentals' && (
@@ -1371,7 +1372,7 @@ function BacktestMultiChart({ ticks, trades, currentIdx, onTickClick }: {
 interface ZdSession { apiKey: string; accessToken: string; userName: string; userId: string; }
 interface ExecLogEntry { time: string; type: 'BUY'|'SELL'|'INFO'|'ERROR'; symbol: string; qty?: number; price?: number; msg: string; orderId?: string; paper?: boolean; }
 
-function LiveTradingTab({ symbol }: { symbol: string }) {
+function LiveTradingTab({ symbol, rsiPeriod, threshold, capital }: { symbol: string; rsiPeriod: number; threshold: number; capital: number }) {
   const [session,       setSession]       = useState<ZdSession | null>(null);
   const [showConnect,   setShowConnect]   = useState(false);
   const [apiKeyInput,   setApiKeyInput]   = useState('');
@@ -1389,6 +1390,13 @@ function LiveTradingTab({ symbol }: { symbol: string }) {
   const [limitPrice,    setLimitPrice]    = useState('');
   const [paperMode,     setPaperMode]     = useState(false);
   const [placingOrder,  setPlacingOrder]  = useState(false);
+  const [paperPos,      setPaperPos]      = useState<{qty: number; avgCost: number; cash: number}>({ qty: 0, avgCost: 0, cash: capital });
+  const [liveAutoQty,   setLiveAutoQty]   = useState(0);
+  const [checkingSignal,setCheckingSignal]= useState(false);
+  const [nextCheckIn,   setNextCheckIn]   = useState(0);
+  const monitorRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const POLL_SECS = 300; // 5 minutes
 
   /* Load session from localStorage on mount */
   useEffect(() => {
@@ -1413,6 +1421,33 @@ function LiveTradingTab({ symbol }: { symbol: string }) {
       if (!o.error)  setOrders(Array.isArray(o) ? o : []);
     }).catch(() => {});
   }, [session]);
+
+  useEffect(() => {
+    if (monitorRef.current)  { clearInterval(monitorRef.current);  monitorRef.current  = null; }
+    if (countdownRef.current){ clearInterval(countdownRef.current); countdownRef.current = null; }
+    if (!armed || paused) { setNextCheckIn(0); return; }
+
+    // Snapshot current refs so callbacks use latest values
+    const runCheck = () => checkAndAutoExecute(paperPos, paperMode, liveAutoQty);
+
+    // Immediate check on arm
+    runCheck();
+    setNextCheckIn(POLL_SECS);
+
+    monitorRef.current = setInterval(() => {
+      runCheck();
+      setNextCheckIn(POLL_SECS);
+    }, POLL_SECS * 1000);
+
+    countdownRef.current = setInterval(() => {
+      setNextCheckIn(prev => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => {
+      if (monitorRef.current)  clearInterval(monitorRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, [armed, paused]);
 
   const disconnect = () => {
     ['zd_api_key','zd_api_secret','zd_access_token','zd_user_name','zd_user_id','zd_connected_at']
@@ -1468,6 +1503,94 @@ function LiveTradingTab({ symbol }: { symbol: string }) {
     setPlacingOrder(false);
   };
 
+  const autoPlaceOrder = async (signal: 'BUY' | 'SELL', price: number, qty: number, isPaper: boolean) => {
+    const entry: ExecLogEntry = {
+      time: new Date().toLocaleTimeString('en-IN'),
+      type: signal,
+      symbol: symbol.toUpperCase(),
+      qty,
+      price,
+      msg: `AUTO ${isPaper ? 'PAPER ' : ''}${signal} ${qty} × ${symbol.toUpperCase()} @ ₹${price.toFixed(2)}`,
+      paper: isPaper,
+    };
+    if (isPaper) {
+      setPaperPos(prev => {
+        if (signal === 'BUY') {
+          const cost = qty * price;
+          return { qty, avgCost: price, cash: prev.cash - cost };
+        } else {
+          return { qty: 0, avgCost: 0, cash: prev.cash + qty * price };
+        }
+      });
+      setExecLog(prev => [{ ...entry, orderId: 'PAPER-' + Date.now() }, ...prev.slice(0, 99)]);
+      return;
+    }
+    try {
+      const res = await fetch('/api/broker/zerodha/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: session!.apiKey, access_token: session!.accessToken,
+          tradingsymbol: symbol.toUpperCase(), exchange: 'NSE',
+          transaction_type: signal, quantity: qty,
+          order_type: 'MARKET', product: 'CNC',
+          tag: 'AlphaForge-Auto',
+        }),
+      });
+      const d = await res.json() as Record<string, unknown>;
+      if (d.error) throw new Error(d.error as string);
+      if (signal === 'BUY') setLiveAutoQty(qty);
+      else setLiveAutoQty(0);
+      setExecLog(prev => [{ ...entry, orderId: d.order_id as string }, ...prev.slice(0, 99)]);
+    } catch (e) {
+      setExecLog(prev => [{ time: entry.time, type: 'ERROR', symbol: symbol.toUpperCase(), msg: `Auto ${signal} failed: ${e}` }, ...prev.slice(0, 99)]);
+    }
+  };
+
+  const checkAndAutoExecute = useCallback(async (pos: { qty: number; avgCost: number; cash: number }, isPaper: boolean, liveQty: number) => {
+    setCheckingSignal(true);
+    try {
+      const res = await fetch(`/api/stock/${symbol}/chart?range=3mo`);
+      const data = await res.json() as { bars?: Array<{ t: string; c: number }> };
+      if (!data?.bars?.length || data.bars.length < rsiPeriod + 2) {
+        setExecLog(prev => [{ time: new Date().toLocaleTimeString('en-IN'), type: 'INFO', symbol: symbol.toUpperCase(), msg: 'Signal check: not enough bars' }, ...prev.slice(0, 99)]);
+        return;
+      }
+      const closes = data.bars.map((b) => b.c);
+      const rsiVals = rsi(closes, rsiPeriod);
+      const n = rsiVals.length - 1;
+      const curr = rsiVals[n]; const prev2 = rsiVals[n - 1];
+      if (curr == null || prev2 == null) return;
+
+      const currScore = curr / 100;
+      const prevScore = prev2 / 100;
+      const price = closes[n];
+
+      let signal: 'BUY' | 'SELL' | null = null;
+      const heldQty = isPaper ? pos.qty : liveQty;
+      if (currScore > threshold && prevScore <= threshold && heldQty === 0) signal = 'BUY';
+      if (currScore <= threshold && prevScore > threshold && heldQty > 0) signal = 'SELL';
+
+      if (signal === 'BUY') {
+        const availCash = isPaper ? pos.cash : capital;
+        const qty = Math.max(1, Math.floor(availCash / price));
+        await autoPlaceOrder('BUY', price, qty, isPaper);
+      } else if (signal === 'SELL') {
+        await autoPlaceOrder('SELL', price, heldQty, isPaper);
+      } else {
+        setExecLog(prev => [{
+          time: new Date().toLocaleTimeString('en-IN'),
+          type: 'INFO', symbol: symbol.toUpperCase(),
+          msg: `Signal check · RSI ${curr.toFixed(1)} · threshold ${(threshold * 100).toFixed(0)} · no crossover`,
+          paper: isPaper,
+        }, ...prev.slice(0, 99)]);
+      }
+    } catch (e) {
+      setExecLog(prev => [{ time: new Date().toLocaleTimeString('en-IN'), type: 'ERROR', symbol: symbol.toUpperCase(), msg: `Signal check error: ${e}` }, ...prev.slice(0, 99)]);
+    }
+    setCheckingSignal(false);
+  }, [symbol, rsiPeriod, threshold, capital, session]);
+
   const equityFunds = (funds as Record<string, Record<string,unknown>> | null)?.equity;
   const availableMargin = equityFunds?.available_margin ?? equityFunds?.net;
   const usedMargin      = equityFunds?.utilised_margin ?? 0;
@@ -1518,13 +1641,21 @@ function LiveTradingTab({ symbol }: { symbol: string }) {
           <div className="section-label" style={{ marginBottom: 6 }}>Strategy state</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: armed && !paused ? 'var(--up-dark)' : 'var(--text-secondary)' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: armed && !paused ? 'var(--up-dark)' : 'var(--text-tertiary)', display: 'inline-block' }} />
-            {!session && !paperMode ? 'Not armed · connect a broker to begin' : armed ? (paused ? 'Paused' : 'Armed · monitoring') : 'Idle · click Arm to start'}
+            {!session && !paperMode ? 'Not armed · connect a broker to begin' : armed ? (paused ? 'Paused' : checkingSignal ? 'Checking signal…' : `Armed · next check ${nextCheckIn > 0 ? `in ${nextCheckIn}s` : '…'}`) : 'Idle · click Arm to start'}
           </div>
         </div>
         <div className="strip__cell">
           <div className="section-label" style={{ marginBottom: 6 }}>Controls</div>
           <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn--primary btn--sm" disabled={!session && !paperMode} onClick={() => { setArmed(a => !a); setPaused(false); }}>
+            <button className="btn btn--primary btn--sm" disabled={!session && !paperMode} onClick={() => {
+              if (armed) {
+                setArmed(false); setPaused(false);
+                if (!paperMode) return;  // reset paper on disarm? Keep it. Don't reset paper pos on disarm.
+              } else {
+                if (paperMode) setPaperPos({ qty: 0, avgCost: 0, cash: capital });
+                setArmed(true); setPaused(false);
+              }
+            }}>
               {armed ? 'Disarm' : 'Arm strategy'}
             </button>
             <button className="btn btn--secondary btn--sm" disabled={!armed} onClick={() => setPaused(p => !p)}>
@@ -1550,6 +1681,41 @@ function LiveTradingTab({ symbol }: { symbol: string }) {
           </div>
         ))}
       </div>
+
+      {/* Strategy config card */}
+      <div style={{ background: 'var(--bg-primary)', border: '0.5px solid var(--border-tertiary)', borderRadius: 10, padding: '12px 16px' }}>
+        <div className="section-label" style={{ marginBottom: 8 }}>Strategy config</div>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 12 }}>
+          <div><span style={{ color: 'var(--text-secondary)' }}>RSI period </span><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>{rsiPeriod}</span></div>
+          <div><span style={{ color: 'var(--text-secondary)' }}>Buy threshold </span><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>RSI &gt; {(threshold * 100).toFixed(0)}</span></div>
+          <div><span style={{ color: 'var(--text-secondary)' }}>Sell threshold </span><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>RSI &lt; {(threshold * 100).toFixed(0)}</span></div>
+          <div><span style={{ color: 'var(--text-secondary)' }}>Strategy capital </span><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>₹{capital.toLocaleString('en-IN')}</span></div>
+          <div><span style={{ color: 'var(--text-secondary)' }}>Poll interval </span><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>5 min</span></div>
+        </div>
+      </div>
+
+      {/* Paper positions */}
+      {paperMode && (
+        <div style={{ background: 'var(--bg-primary)', border: '0.5px solid var(--border-tertiary)', borderRadius: 10, padding: '12px 16px' }}>
+          <div className="section-label" style={{ marginBottom: 8 }}>Paper account</div>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 12 }}>
+            <div>
+              <div style={{ color: 'var(--text-secondary)', marginBottom: 2 }}>Cash</div>
+              <div style={{ fontWeight: 500 }}>₹{paperPos.cash.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-secondary)', marginBottom: 2 }}>Position</div>
+              <div style={{ fontWeight: 500 }}>{paperPos.qty > 0 ? `${paperPos.qty} shares @ ₹${paperPos.avgCost.toFixed(2)}` : 'Flat'}</div>
+            </div>
+            {paperPos.qty > 0 && (
+              <div>
+                <div style={{ color: 'var(--text-secondary)', marginBottom: 2 }}>Total capital</div>
+                <div style={{ fontWeight: 500 }}>₹{(paperPos.cash + paperPos.qty * paperPos.avgCost).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Connect modal */}
       {showConnect && !session && (
