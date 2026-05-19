@@ -17,28 +17,38 @@ const WatchlistPanel  = dynamic(() => import('./WatchlistPanel'),  { ssr: false 
 const NotificationPanel = dynamic(() => import('./NotificationPanel'), { ssr: false });
 
 interface Props {
-  marketStatus: MarketStatus;
+  marketStatus:     MarketStatus;
   marketStatusTime: string;
+  marketStatusReason?: string;
 }
 
-function MarketStatusPill({ status, time }: { status: MarketStatus; time: string }) {
-  const d    = new Date(time);
-  const hhmm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+function MarketStatusPill({ status, time, reason }: { status: MarketStatus; time: string; reason?: string }) {
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const ist       = new Date(new Date(time).getTime() + istOffset);
+  const hhmm      = `${String(ist.getUTCHours()).padStart(2,'0')}:${String(ist.getUTCMinutes()).padStart(2,'0')}`;
+  const prefix    = 'NSE · IND';
+
   if (status === 'open') return (
     <span className={styles.statusPill + ' ' + styles.statusOpen}>
-      <span className="pulse pulse--up" style={{ width: 6, height: 6 }} /> MARKET OPEN · {hhmm} IST
+      <span className="pulse pulse--up" style={{ width: 6, height: 6 }} />
+      {prefix} · OPEN · {hhmm} IST
     </span>
   );
   if (status === 'pre-open') return (
     <span className={styles.statusPill + ' ' + styles.statusPreOpen}>
-      <span className="pulse pulse--caution" style={{ width: 6, height: 6 }} /> PRE-OPEN · {hhmm} IST
+      <span className="pulse pulse--caution" style={{ width: 6, height: 6 }} />
+      {prefix} · PRE-OPEN · {hhmm} IST
     </span>
   );
   if (status === 'holiday') return (
-    <span className={styles.statusPill + ' ' + styles.statusClosed}>MARKET CLOSED · HOLIDAY</span>
+    <span className={styles.statusPill + ' ' + styles.statusClosed}>
+      {prefix} · CLOSED · {reason === 'weekend' ? 'WEEKEND' : 'HOLIDAY'}
+    </span>
   );
   return (
-    <span className={styles.statusPill + ' ' + styles.statusClosed}>MARKET CLOSED · {hhmm} IST</span>
+    <span className={styles.statusPill + ' ' + styles.statusClosed}>
+      {prefix} · CLOSED · {hhmm} IST
+    </span>
   );
 }
 
@@ -58,7 +68,7 @@ function StrategyDropdown({ pathname }: { pathname: string }) {
   );
 }
 
-export default function GlobalNav({ marketStatus, marketStatusTime }: Props) {
+export default function GlobalNav({ marketStatus, marketStatusTime, marketStatusReason }: Props) {
   const pathname = usePathname();
   const [cmdOpen,    setCmdOpen]    = useState(false);
   const [watchOpen,  setWatchOpen]  = useState(false);
@@ -91,10 +101,13 @@ export default function GlobalNav({ marketStatus, marketStatusTime }: Props) {
               Market Pulse
             </Link>
             <StrategyDropdown pathname={pathname ?? ''} />
+            <Link href="/portfolio-trading" className={styles.navTab + (pathname?.startsWith('/portfolio-trading') ? ' ' + styles.navTabActive : '')}>
+              Portfolio
+            </Link>
           </div>
 
           <div className={styles.actions}>
-            <MarketStatusPill status={marketStatus} time={marketStatusTime} />
+            <MarketStatusPill status={marketStatus} time={marketStatusTime} reason={marketStatusReason} />
 
             {/* Search */}
             <button className={styles.iconBtn} onClick={() => setCmdOpen(true)} aria-label="Search (⌘K)">
