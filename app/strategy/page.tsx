@@ -124,7 +124,7 @@ export default function StrategyLabPage() {
 
   return (
     <div className={styles.page}>
-      <GlobalNav marketStatus={getMarketStatus().status} marketStatusTime={new Date().toISOString()} />
+      <GlobalNav marketStatus={getMarketStatus().status} marketStatusTime={new Date().toISOString()} marketStatusReason={getMarketStatus().reason} />
 
       <div className={'page-container ' + styles.inner}>
         {/* Page header */}

@@ -109,7 +109,7 @@ export default function ComparePage() {
 
   return (
     <div className={styles.page}>
-      <GlobalNav marketStatus={getMarketStatus().status} marketStatusTime={new Date().toISOString()} />
+      <GlobalNav marketStatus={getMarketStatus().status} marketStatusTime={new Date().toISOString()} marketStatusReason={getMarketStatus().reason} />
 
       <div className={'page-container ' + styles.inner}>
         {/* Breadcrumb + header */}
