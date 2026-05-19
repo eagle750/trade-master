@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { IconLoader2, IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 
-export default function ZerodhaCompletePage() {
+function ZerodhaCompleteInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -54,5 +54,17 @@ export default function ZerodhaCompletePage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function ZerodhaCompletePage() {
+  return (
+    <Suspense fallback={
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)' }}>
+        <IconLoader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--brand)' }} />
+      </div>
+    }>
+      <ZerodhaCompleteInner />
+    </Suspense>
   );
 }
