@@ -16,7 +16,7 @@ import NewsRail from '@/components/NewsRail';
 import DisclaimerFooter from '@/components/DisclaimerFooter';
 import { getMarketStatus } from '@/lib/marketStatus';
 import { formatPrice, formatMcap, formatPct, formatDate } from '@/lib/format';
-import { rsi } from '@/lib/indicators';
+import { rsi, ema } from '@/lib/indicators';
 import type { StockOverviewData } from '@/app/api/stock/[symbol]/route';
 import { getWatchlists, addToWatchlist, isInAnyWatchlist, createWatchlist } from '@/lib/watchlist';
 import type { BacktestResult, TickState, TradeEvent } from '@/lib/backtestEngine';
@@ -74,6 +74,8 @@ export default function StockPage({ params }: { params: Promise<{ symbol: string
   const [chartType,     setChartType]     = useState<'line' | 'candle'>('candle');
   const [chartRange,    setChartRange]    = useState('1Y');
   const [activeInds,    setActiveInds]    = useState(new Set(['sma20', 'sma50', 'volume']));
+  const [showAddMenu,   setShowAddMenu]   = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
   /* Backtest config + replay */
   const defaultFrom = (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 3); return d.toISOString().slice(0, 10); })();
   const defaultTo   = new Date().toISOString().slice(0, 10);
@@ -151,6 +153,12 @@ export default function StockPage({ params }: { params: Promise<{ symbol: string
   const currentTick: TickState | undefined = btResult?.ticks[tickIdx];
 
   const toggleInd = (id: string) => setActiveInds((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => { if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) setShowAddMenu(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const { status, reason: marketReason } = getMarketStatus();
   const stock = data ?? emptyStock(symbol);
@@ -408,11 +416,49 @@ export default function StockPage({ params }: { params: Promise<{ symbol: string
             )}
 
             {/* Indicator chips */}
-            <div className={styles.indicatorRow}>
+            <div className={styles.indicatorRow} style={{ position: 'relative' }}>
               {[{id:'sma20',label:'SMA 20'},{id:'sma50',label:'SMA 50'},{id:'sma200',label:'SMA 200'},{id:'bb',label:'Bollinger'},{id:'rsi14',label:'RSI 14'},{id:'macd',label:'MACD'},{id:'volume',label:'Volume'}].map((ind) => (
                 <button key={ind.id} className={'chip' + (activeInds.has(ind.id) ? ' chip--selected' : '')} onClick={() => toggleInd(ind.id)} style={{ fontSize: 11, padding: '4px 10px' }}>{ind.label}</button>
               ))}
-              <button className="btn btn--ghost btn--xs"><IconPlus size={11} /> Add</button>
+              {/* Active extras */}
+              {[{id:'ema9',label:'EMA 9'},{id:'ema21',label:'EMA 21'},{id:'ema50',label:'EMA 50'}].filter(ind => activeInds.has(ind.id)).map((ind) => (
+                <button key={ind.id} className="chip chip--selected" onClick={() => toggleInd(ind.id)} style={{ fontSize: 11, padding: '4px 10px' }}>{ind.label}</button>
+              ))}
+              <div ref={addMenuRef} style={{ position: 'relative' }}>
+                <button className="btn btn--ghost btn--xs" onClick={() => setShowAddMenu(v => !v)}>
+                  <IconPlus size={11} /> Add
+                </button>
+                {showAddMenu && (
+                  <div style={{
+                    position: 'absolute', top: '110%', left: 0, zIndex: 50, minWidth: 160,
+                    background: 'var(--bg-primary)', border: '0.5px solid var(--border-secondary)',
+                    borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '4px 0',
+                  }}>
+                    {[
+                      {id:'ema9',   label:'EMA 9',   color:'#27AE60', desc:'Fast momentum'},
+                      {id:'ema21',  label:'EMA 21',  color:'#3498DB', desc:'Short trend'},
+                      {id:'ema50',  label:'EMA 50',  color:'#1ABC9C', desc:'Medium trend'},
+                      {id:'sma20',  label:'SMA 20',  color:'#E2A33C', desc:'20-day average'},
+                      {id:'sma50',  label:'SMA 50',  color:'#9B59B6', desc:'50-day average'},
+                      {id:'sma200', label:'SMA 200', color:'#E74C3C', desc:'200-day average'},
+                      {id:'bb',     label:'Bollinger Bands', color:'var(--caution)', desc:'Volatility bands'},
+                      {id:'rsi14',  label:'RSI 14',  color:'var(--brand)', desc:'Momentum oscillator'},
+                      {id:'macd',   label:'MACD',    color:'var(--brand)', desc:'Trend + momentum'},
+                      {id:'volume', label:'Volume',  color:'var(--text-tertiary)', desc:'Trading volume'},
+                    ].map((ind) => (
+                      <button key={ind.id} onClick={() => toggleInd(ind.id)} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                        padding: '7px 12px', background: 'none', border: 'none', cursor: 'pointer',
+                        textAlign: 'left', opacity: activeInds.has(ind.id) ? 1 : 0.7,
+                      }}>
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: ind.color, flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, fontWeight: activeInds.has(ind.id) ? 600 : 400, color: 'var(--text-primary)', flex: 1 }}>{ind.label}</span>
+                        <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>{activeInds.has(ind.id) ? '✓' : ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Chart rendering */}
@@ -1843,13 +1889,17 @@ function MultiPaneChart({ bars, indicators, activeIndicators, chartType }: {
   activeIndicators: Set<string>;
   chartType: 'line' | 'candle';
 }) {
-  const showVol = activeIndicators.has('volume');
-  const showRSI = activeIndicators.has('rsi14');
-  const showMACD= activeIndicators.has('macd');
-  const showBB  = activeIndicators.has('bb');
-  const showS20 = activeIndicators.has('sma20');
-  const showS50 = activeIndicators.has('sma50');
-  const showS200= activeIndicators.has('sma200');
+  const showVol  = activeIndicators.has('volume');
+  const showRSI  = activeIndicators.has('rsi14');
+  const showMACD = activeIndicators.has('macd');
+  const showBB   = activeIndicators.has('bb');
+  const showS20  = activeIndicators.has('sma20');
+  const showS50  = activeIndicators.has('sma50');
+  const showS200 = activeIndicators.has('sma200');
+  const showE9   = activeIndicators.has('ema9');
+  const showE21  = activeIndicators.has('ema21');
+  const showE50  = activeIndicators.has('ema50');
+
 
   const paneH    = 280;
   const volPaneH = showVol  ? VOL_H  : 0;
@@ -1861,6 +1911,9 @@ function MultiPaneChart({ bars, indicators, activeIndicators, chartType }: {
   const prices = bars.map((b) => b.c);
   const highs  = bars.map((b) => b.h);
   const lows   = bars.map((b) => b.l);
+  const ema9vals  = showE9  ? ema(prices, 9)  : [];
+  const ema21vals = showE21 ? ema(prices, 21) : [];
+  const ema50vals = showE50 ? ema(prices, 50) : [];
   const minP   = Math.min(...lows) * 0.998, maxP = Math.max(...highs) * 1.002, rngP = maxP - minP || 1;
 
   const px   = (i: number) => PADL + (i / (bars.length - 1 || 1)) * cw;
@@ -1903,6 +1956,28 @@ function MultiPaneChart({ bars, indicators, activeIndicators, chartType }: {
       {showS20  && <path d={linePath(indicators.sma20??[], pyP)} fill="none" stroke="#E2A33C" strokeWidth="1"/>}
       {showS50  && <path d={linePath(indicators.sma50??[], pyP)} fill="none" stroke="#9B59B6" strokeWidth="1"/>}
       {showS200 && <path d={linePath(indicators.sma200??[], pyP)} fill="none" stroke="#E74C3C" strokeWidth="1"/>}
+      {showE9   && <path d={linePath(ema9vals,  pyP)} fill="none" stroke="#27AE60" strokeWidth="1"/>}
+      {showE21  && <path d={linePath(ema21vals, pyP)} fill="none" stroke="#3498DB" strokeWidth="1"/>}
+      {showE50  && <path d={linePath(ema50vals, pyP)} fill="none" stroke="#1ABC9C" strokeWidth="1"/>}
+      {/* Legend */}
+      {(() => {
+        const items: {label: string; color: string; dash?: boolean}[] = [];
+        if (showS20)  items.push({label:'SMA 20',  color:'#E2A33C'});
+        if (showS50)  items.push({label:'SMA 50',  color:'#9B59B6'});
+        if (showS200) items.push({label:'SMA 200', color:'#E74C3C'});
+        if (showBB)   items.push({label:'BB',      color:'#F39C12', dash:true});
+        if (showE9)   items.push({label:'EMA 9',   color:'#27AE60'});
+        if (showE21)  items.push({label:'EMA 21',  color:'#3498DB'});
+        if (showE50)  items.push({label:'EMA 50',  color:'#1ABC9C'});
+        if (!items.length) return null;
+        const lx = PADL + cw - 4;
+        return items.map((item, i) => (
+          <g key={item.label}>
+            <line x1={lx - 90} x2={lx - 76} y1={PADT + 8 + i * 14} y2={PADT + 8 + i * 14} stroke={item.color} strokeWidth={item.dash ? 1.2 : 1.5} strokeDasharray={item.dash ? '3,2' : undefined} />
+            <text x={lx - 72} y={PADT + 11 + i * 14} fontSize="8" fill="var(--text-secondary)" fontFamily="var(--font-mono)">{item.label}</text>
+          </g>
+        ));
+      })()}
       {showVol && (<><line x1={PADL} x2={PADL+cw} y1={PADT+paneH} y2={PADT+paneH} stroke="var(--border-tertiary)" strokeWidth="0.5"/><text x={PADL-3} y={PADT+paneH+10} fontSize="7" fill="var(--text-tertiary)" textAnchor="end">VOL</text>{bars.map((b,i)=>{ const vol=(vols[i] as number)??0; if(!vol) return null; const bH=Math.max(1,volBase-pyV(vol)); return <rect key={i} x={px(i)-barW/2} y={pyV(vol)} width={barW} height={bH} fill={b.c>=b.o?'var(--up-bg)':'var(--down-bg)'}/>;})}</>)}
       {showRSI && (<><line x1={PADL} x2={PADL+cw} y1={PADT+paneH+volPaneH} y2={PADT+paneH+volPaneH} stroke="var(--border-tertiary)" strokeWidth="0.5"/><text x={PADL-3} y={PADT+paneH+volPaneH+10} fontSize="7" fill="var(--text-tertiary)" textAnchor="end">RSI</text><line x1={PADL} x2={PADL+cw} y1={pyRSI(70)} y2={pyRSI(70)} stroke="var(--down)" strokeWidth="0.5" strokeDasharray="3,2" opacity="0.5"/><line x1={PADL} x2={PADL+cw} y1={pyRSI(30)} y2={pyRSI(30)} stroke="var(--up)" strokeWidth="0.5" strokeDasharray="3,2" opacity="0.5"/><path d={linePath(indicators.rsi14??[], pyRSI)} fill="none" stroke="var(--brand)" strokeWidth="1"/></>)}
       {showMACD && (<><line x1={PADL} x2={PADL+cw} y1={rsiBase} y2={rsiBase} stroke="var(--border-tertiary)" strokeWidth="0.5"/><text x={PADL-3} y={rsiBase+10} fontSize="7" fill="var(--text-tertiary)" textAnchor="end">MACD</text><line x1={PADL} x2={PADL+cw} y1={macdMid} y2={macdMid} stroke="var(--border-secondary)" strokeWidth="0.5"/>{macdHist.map((v,i)=>{ if(v==null)return null; const y1=pyMacd(0),y2=pyMacd(v); return <rect key={i} x={px(i)-barW/2} y={Math.min(y1,y2)} width={barW} height={Math.abs(y1-y2)||1} fill={v>=0?'var(--up-bg)':'var(--down-bg)'}/>;})}<path d={linePath(macdLine, pyMacd)} fill="none" stroke="var(--brand)" strokeWidth="1"/><path d={linePath(macdSignal, pyMacd)} fill="none" stroke="var(--caution)" strokeWidth="0.8"/></>)}
