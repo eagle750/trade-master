@@ -112,10 +112,13 @@ export default function StrategyLabPage() {
   const handleRun = () => {
     if (!canRun) return;
     setStage('running');
-    /* Persist run parameters for the funnel page */
     const nField = paramBlocks.flatMap((b) => b.fields).find((f) => f.id === 'n_picks');
     sessionStorage.setItem('af_run_params', JSON.stringify({
-      nPicks: Number(nField?.value ?? 20),
+      nPicks:       Number(nField?.value ?? 20),
+      strategyIdea: inputText.slice(0, 600),
+      briefBullets: brief?.bullets ?? [],
+      confidence:   brief?.confidenceLabel ?? '',
+      parsedAt:     new Date().toISOString(),
     }));
     router.push('/strategy/funnel');
   };

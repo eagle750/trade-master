@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconArrowsLeftRight, IconLoader2, IconAlertTriangle, IconDownload, IconCheck, IconPencil, IconX } from '@tabler/icons-react';
+import { IconArrowsLeftRight, IconLoader2, IconAlertTriangle, IconDownload, IconCheck, IconPencil, IconX, IconChevronDown, IconChevronUp, IconBolt } from '@tabler/icons-react';
 import GlobalNav from '@/components/GlobalNav';
 import StepIndicator from '@/components/StepIndicator';
 import FunnelStageCard from '@/components/FunnelStageCard';
@@ -37,6 +37,102 @@ function readRunParams() {
   if (typeof window === 'undefined') return {};
   try { return JSON.parse(sessionStorage.getItem('af_run_params') ?? '{}'); }
   catch { return {}; }
+}
+
+interface BriefBullet { stage: string; text: string; }
+interface RunContext {
+  strategyIdea?: string;
+  briefBullets?: BriefBullet[];
+  confidence?:   string;
+  parsedAt?:     string;
+  nPicks?:       number;
+}
+
+function StrategyContextBar({ ctx }: { ctx: RunContext }) {
+  const [open, setOpen] = useState(false);
+  if (!ctx.strategyIdea && !ctx.briefBullets?.length) return null;
+
+  const confidenceColor =
+    ctx.confidence === 'High'   ? 'var(--up-dark)' :
+    ctx.confidence === 'Medium' ? 'var(--caution-dark)' : 'var(--text-tertiary)';
+
+  return (
+    <div style={{
+      border: '0.5px solid var(--border-tertiary)', borderRadius: 8,
+      background: 'var(--bg-primary)', marginBottom: 12, overflow: 'hidden',
+    }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 14px', background: 'none', border: 'none', cursor: 'pointer',
+          textAlign: 'left',
+        }}
+      >
+        <IconBolt size={13} color="var(--brand)" />
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>
+          Strategy context
+        </span>
+        {ctx.confidence && (
+          <span style={{ fontSize: 10, color: confidenceColor, fontWeight: 600, marginRight: 6 }}>
+            {ctx.confidence} confidence
+          </span>
+        )}
+        {ctx.nPicks && (
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)', marginRight: 6 }}>
+            Top {ctx.nPicks} picks
+          </span>
+        )}
+        {ctx.parsedAt && (
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)', marginRight: 8 }}>
+            Parsed {new Date(ctx.parsedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
+        {open ? <IconChevronUp size={13} /> : <IconChevronDown size={13} />}
+      </button>
+
+      {open && (
+        <div style={{ padding: '0 14px 14px', borderTop: '0.5px solid var(--border-tertiary)' }}>
+          {ctx.strategyIdea && (
+            <div style={{ marginTop: 10, marginBottom: ctx.briefBullets?.length ? 10 : 0 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>
+                Original idea
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                {ctx.strategyIdea}
+              </p>
+            </div>
+          )}
+          {ctx.briefBullets && ctx.briefBullets.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+                Parsed rules
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {ctx.briefBullets.map((b, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4,
+                      background: 'var(--brand-bg)', color: 'var(--brand)',
+                      whiteSpace: 'nowrap', alignSelf: 'flex-start', marginTop: 1,
+                    }}>
+                      {b.stage}
+                    </span>
+                    <span style={{ color: 'var(--text-secondary)', lineHeight: 1.5 }}>{b.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ marginTop: 10 }}>
+            <a href="/strategy" style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none' }}>
+              ← Modify strategy
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function FunnelPage() {
@@ -202,6 +298,8 @@ export default function FunnelPage() {
         <div className={styles.stepRow}>
           <StepIndicator active={3} />
         </div>
+
+        <StrategyContextBar ctx={readRunParams() as RunContext} />
 
         {error && (
           <div className="banner banner--error" style={{ marginBottom: 12 }}>
