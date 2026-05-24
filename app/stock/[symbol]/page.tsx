@@ -461,6 +461,33 @@ export default function StockPage({ params }: { params: Promise<{ symbol: string
               </div>
             </div>
 
+            {/* Compact legend strip */}
+            {(() => {
+              const legendItems = [
+                {id:'sma20',  label:'SMA 20',  color:'#E2A33C'},
+                {id:'sma50',  label:'SMA 50',  color:'#9B59B6'},
+                {id:'sma200', label:'SMA 200', color:'#E74C3C'},
+                {id:'bb',     label:'BB',      color:'#F39C12', dash:true},
+                {id:'ema9',   label:'EMA 9',   color:'#27AE60'},
+                {id:'ema21',  label:'EMA 21',  color:'#3498DB'},
+                {id:'ema50',  label:'EMA 50',  color:'#1ABC9C'},
+              ].filter(i => activeInds.has(i.id));
+              if (!legendItems.length) return null;
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px', padding: '4px 2px', marginBottom: 2 }}>
+                  {legendItems.map(item => (
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <svg width="14" height="6" style={{ flexShrink: 0 }}>
+                        <line x1="0" y1="3" x2="14" y2="3" stroke={item.color} strokeWidth="2"
+                          strokeDasharray={'dash' in item ? '3,2' : undefined} />
+                      </svg>
+                      <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             {/* Chart rendering */}
             {loadingChart ? (
               <div className="skeleton" style={{ height: 480, borderRadius: 8 }} />
@@ -1959,25 +1986,6 @@ function MultiPaneChart({ bars, indicators, activeIndicators, chartType }: {
       {showE9   && <path d={linePath(ema9vals,  pyP)} fill="none" stroke="#27AE60" strokeWidth="1"/>}
       {showE21  && <path d={linePath(ema21vals, pyP)} fill="none" stroke="#3498DB" strokeWidth="1"/>}
       {showE50  && <path d={linePath(ema50vals, pyP)} fill="none" stroke="#1ABC9C" strokeWidth="1"/>}
-      {/* Legend */}
-      {(() => {
-        const items: {label: string; color: string; dash?: boolean}[] = [];
-        if (showS20)  items.push({label:'SMA 20',  color:'#E2A33C'});
-        if (showS50)  items.push({label:'SMA 50',  color:'#9B59B6'});
-        if (showS200) items.push({label:'SMA 200', color:'#E74C3C'});
-        if (showBB)   items.push({label:'BB',      color:'#F39C12', dash:true});
-        if (showE9)   items.push({label:'EMA 9',   color:'#27AE60'});
-        if (showE21)  items.push({label:'EMA 21',  color:'#3498DB'});
-        if (showE50)  items.push({label:'EMA 50',  color:'#1ABC9C'});
-        if (!items.length) return null;
-        const lx = PADL + cw - 4;
-        return items.map((item, i) => (
-          <g key={item.label}>
-            <line x1={lx - 90} x2={lx - 76} y1={PADT + 8 + i * 14} y2={PADT + 8 + i * 14} stroke={item.color} strokeWidth={item.dash ? 1.2 : 1.5} strokeDasharray={item.dash ? '3,2' : undefined} />
-            <text x={lx - 72} y={PADT + 11 + i * 14} fontSize="8" fill="var(--text-secondary)" fontFamily="var(--font-mono)">{item.label}</text>
-          </g>
-        ));
-      })()}
       {showVol && (<><line x1={PADL} x2={PADL+cw} y1={PADT+paneH} y2={PADT+paneH} stroke="var(--border-tertiary)" strokeWidth="0.5"/><text x={PADL-3} y={PADT+paneH+10} fontSize="7" fill="var(--text-tertiary)" textAnchor="end">VOL</text>{bars.map((b,i)=>{ const vol=(vols[i] as number)??0; if(!vol) return null; const bH=Math.max(1,volBase-pyV(vol)); return <rect key={i} x={px(i)-barW/2} y={pyV(vol)} width={barW} height={bH} fill={b.c>=b.o?'var(--up-bg)':'var(--down-bg)'}/>;})}</>)}
       {showRSI && (<><line x1={PADL} x2={PADL+cw} y1={PADT+paneH+volPaneH} y2={PADT+paneH+volPaneH} stroke="var(--border-tertiary)" strokeWidth="0.5"/><text x={PADL-3} y={PADT+paneH+volPaneH+10} fontSize="7" fill="var(--text-tertiary)" textAnchor="end">RSI</text><line x1={PADL} x2={PADL+cw} y1={pyRSI(70)} y2={pyRSI(70)} stroke="var(--down)" strokeWidth="0.5" strokeDasharray="3,2" opacity="0.5"/><line x1={PADL} x2={PADL+cw} y1={pyRSI(30)} y2={pyRSI(30)} stroke="var(--up)" strokeWidth="0.5" strokeDasharray="3,2" opacity="0.5"/><path d={linePath(indicators.rsi14??[], pyRSI)} fill="none" stroke="var(--brand)" strokeWidth="1"/></>)}
       {showMACD && (<><line x1={PADL} x2={PADL+cw} y1={rsiBase} y2={rsiBase} stroke="var(--border-tertiary)" strokeWidth="0.5"/><text x={PADL-3} y={rsiBase+10} fontSize="7" fill="var(--text-tertiary)" textAnchor="end">MACD</text><line x1={PADL} x2={PADL+cw} y1={macdMid} y2={macdMid} stroke="var(--border-secondary)" strokeWidth="0.5"/>{macdHist.map((v,i)=>{ if(v==null)return null; const y1=pyMacd(0),y2=pyMacd(v); return <rect key={i} x={px(i)-barW/2} y={Math.min(y1,y2)} width={barW} height={Math.abs(y1-y2)||1} fill={v>=0?'var(--up-bg)':'var(--down-bg)'}/>;})}<path d={linePath(macdLine, pyMacd)} fill="none" stroke="var(--brand)" strokeWidth="1"/><path d={linePath(macdSignal, pyMacd)} fill="none" stroke="var(--caution)" strokeWidth="0.8"/></>)}
