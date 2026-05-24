@@ -352,6 +352,7 @@ export default function FunnelPage() {
                       ref={ruleInputRef}
                       value={ruleInput}
                       onChange={(e) => setRuleInput(e.target.value)}
+                      autoComplete="off"
                       rows={2}
                       style={{
                         flex: 1, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-caption)',
@@ -425,6 +426,13 @@ export default function FunnelPage() {
                   </tbody>
                 </table>
               </div>
+            ) : activeStageData?.name === 'Universe' ? (
+              <div className={styles.emptyStage}>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                  {activeStageData.count} stocks in universe — individual rows not shown at this stage.
+                  <br />Click Stage 2 (Eligibility) to see individual stocks.
+                </p>
+              </div>
             ) : (
               <div className={styles.emptyStage}>
                 <IconAlertTriangle size={20} color="var(--caution)" />
@@ -435,7 +443,7 @@ export default function FunnelPage() {
             {/* Stat row */}
             <div className={styles.statRow}>
               <span className="num">
-                <strong>{visibleStocks.length.toLocaleString('en-IN')}</strong> included
+                <strong>{(activeStageData?.name === 'Universe' ? activeStageData.count : visibleStocks.length).toLocaleString('en-IN')}</strong> included
                 {excludedCount > 0 && (
                   <> · <span className={styles.excluded}>{excludedCount} excluded by you</span></>
                 )}
