@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { IconArchive, IconArrowsLeftRight, IconArrowRight, IconAlertTriangle, IconPlayerPlay } from '@tabler/icons-react';
+import { IconArchive, IconArrowsLeftRight, IconArrowRight, IconAlertTriangle } from '@tabler/icons-react';
 import GlobalNav from '@/components/GlobalNav';
 import StepIndicator from '@/components/StepIndicator';
 import EnglishInputCard from '@/components/EnglishInputCard';
@@ -36,6 +36,7 @@ export default function StrategyLabPage() {
   const [paramBlocks, setParamBlocks]     = useState<ParameterBlock[]>([]);
   const [parseError, setParseError]       = useState<string | null>(null);
   const [clarifyQs, setClarifyQs]         = useState<ClarifyingQuestion[]>([]);
+  const [sourceFile, setSourceFile]       = useState<string | null>(null);
   const autoSaveRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleInputChange = (text: string) => {
@@ -68,8 +69,11 @@ export default function StrategyLabPage() {
         setParamBlocks(json.brief.parameters);
         setStage('brief-ready');
       }
-    } catch {
-      setParseError('Parse service not available. Connect the AI API endpoint to enable strategy parsing.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setParseError(msg.includes('401') || msg.includes('auth')
+        ? 'Invalid or expired API key — update ANTHROPIC_API_KEY in .env.local and restart the server.'
+        : `Parse failed: ${msg}`);
       setStage('drafting');
     }
   }, [inputText]);
@@ -79,7 +83,7 @@ export default function StrategyLabPage() {
       const res = await fetch('/api/strategy/parse/answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: inputText, answers }),
+        body: JSON.stringify({ input: inputText, questions: clarifyQs, answers }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
@@ -90,7 +94,7 @@ export default function StrategyLabPage() {
       setParseError('Failed to process answers. Please try again.');
       setStage('drafting');
     }
-  }, [inputText]);
+  }, [inputText, clarifyQs]);
 
   const handleParamChange = useCallback(
     (blockId: string, fieldId: string, value: unknown) => {
@@ -112,13 +116,37 @@ export default function StrategyLabPage() {
   const handleRun = () => {
     if (!canRun) return;
     setStage('running');
-    const nField = paramBlocks.flatMap((b) => b.fields).find((f) => f.id === 'n_picks');
+    const allFields = paramBlocks.flatMap((b) => b.fields);
+    const fv = (id: string) => allFields.find(f => f.id === id)?.value;
+    const numOrUndef = (v: unknown) => (v == null || v === '') ? undefined : Number(v);
+
     sessionStorage.setItem('af_run_params', JSON.stringify({
-      nPicks:       Number(nField?.value ?? 20),
-      strategyIdea: inputText.slice(0, 600),
-      briefBullets: brief?.bullets ?? [],
-      confidence:   brief?.confidenceLabel ?? '',
-      parsedAt:     new Date().toISOString(),
+      nPicks:         numOrUndef(fv('n_picks')),
+      universe:       fv('universe') != null ? String(fv('universe')) : undefined,
+      momentumMonths: numOrUndef(fv('momentum_months')),
+      rankBy:         fv('rank_by') != null ? String(fv('rank_by')) : undefined,
+      minLtp:         numOrUndef(fv('min_ltp')),
+      minMcapCr:      numOrUndef(fv('min_mcap_cr')),
+      /* screen filters — only included if the strategy set them */
+      maxPE:          numOrUndef(fv('max_pe')),
+      minROE:         fv('min_roe') != null && fv('min_roe') !== '' ? Number(fv('min_roe')) / 100 : undefined,
+      maxDE:          numOrUndef(fv('max_de')),
+      minROA:         fv('min_roa') != null && fv('min_roa') !== '' ? Number(fv('min_roa')) / 100 : undefined,
+      maxPB:          numOrUndef(fv('max_pb')),
+      minRevGrowth:   fv('min_rev_growth') != null && fv('min_rev_growth') !== '' ? Number(fv('min_rev_growth')) / 100 : undefined,
+      emaFilter:      fv('ema_filter') != null ? String(fv('ema_filter')) : undefined,
+      emaShort:       numOrUndef(fv('ema_short')),
+      emaMedium:      numOrUndef(fv('ema_medium')),
+      emaLong:        numOrUndef(fv('ema_long')),
+      runCapital:     numOrUndef(fv('run_capital')),
+      stopLossPct:    fv('stop_loss') != null && fv('stop_loss') !== '' ? Number(fv('stop_loss')) : undefined,
+      targetPct:      fv('target_pct') != null && fv('target_pct') !== '' ? Number(fv('target_pct')) : undefined,
+      maxHoldingDays: numOrUndef(fv('max_holding_days')),
+      strategyIdea:   inputText.slice(0, 600),
+      sourceFile:     sourceFile ?? undefined,
+      briefBullets:   brief?.bullets ?? [],
+      confidence:     brief?.confidenceLabel ?? '',
+      parsedAt:       new Date().toISOString(),
     }));
     router.push('/strategy/funnel');
   };
@@ -146,17 +174,6 @@ export default function StrategyLabPage() {
             <button className="btn btn--secondary btn--sm">
               <IconArrowsLeftRight size={14} />
               Compare strategies
-            </button>
-            {/* Direct shortcut — works without LLM parse */}
-            <button
-              className="btn btn--primary btn--sm"
-              onClick={() => {
-                sessionStorage.setItem('af_run_params', JSON.stringify({ nPicks: 20 }));
-                router.push('/strategy/funnel');
-              }}
-            >
-              <IconPlayerPlay size={13} />
-              Run screener
             </button>
           </div>
         </div>
@@ -190,6 +207,7 @@ export default function StrategyLabPage() {
               onParse={handleParse}
               isParsing={stage === 'parsing'}
               isLocked={stage === 'brief-ready'}
+              onFileName={setSourceFile}
             />
 
             {brief && stage === 'brief-ready' && (

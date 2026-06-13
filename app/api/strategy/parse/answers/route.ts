@@ -7,59 +7,77 @@ export const dynamic = 'force-dynamic';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-/* Same stable system prompt — will be served from cache after first /parse call */
 const SYSTEM_PROMPT = `You are AlphaForge's strategy parser for the Indian equity market (NSE).
 
 You have already asked the user clarifying questions about their strategy. Now, given their original
 input AND their answers to those questions, produce the final parsed Brief and Parameters.
 
-Respond with valid JSON:
+Respond with valid JSON containing ALL fields listed below. Every field must be present — use null + source "optional" or "required" for anything not in the strategy or answers:
 {
   "brief": {
     "bullets": [
-      { "stage": "Universe",     "text": "...", "citations": [] },
-      { "stage": "Eligibility",  "text": "...", "citations": [] },
-      { "stage": "Screen",       "text": "...", "citations": ["Q1"] },
-      { "stage": "Rank",         "text": "...", "citations": ["Q2"] },
-      { "stage": "Select",       "text": "...", "citations": ["Q3"] }
+      { "stage": "Universe",    "text": "...", "citations": [] },
+      { "stage": "Eligibility", "text": "...", "citations": [] },
+      { "stage": "Screen",      "text": "...", "citations": ["Q1"] },
+      { "stage": "Rank",        "text": "...", "citations": ["Q2"] },
+      { "stage": "Select",      "text": "...", "citations": ["Q3"] }
     ]
   },
-  "confidence": 0.0-1.0,
+  "confidence": 0.0,
   "parameters": [
     {
-      "id": "money_timeline",
-      "group": "Money & timeline",
+      "id": "money_timeline", "group": "Money & timeline",
       "fields": [
-        { "id": "capital",        "value": 1000000, "source": "default" },
-        { "id": "backtest_start", "value": "2020-01-01", "source": "AI", "confidence": 0.85 },
-        { "id": "backtest_end",   "value": null, "source": "required" }
+        { "id": "capital",        "value": 1000000,    "source": "default" },
+        { "id": "run_capital",    "value": "<INR amount stated or answered — null + source 'required' if missing>", "source": "stated" },
+        { "id": "backtest_start", "value": "2020-01-01", "source": "default" },
+        { "id": "backtest_end",   "value": "2024-12-31", "source": "default" }
       ]
     },
     {
-      "id": "selection",
-      "group": "Selection rules",
+      "id": "selection", "group": "Selection rules",
       "fields": [
-        { "id": "n_picks",        "value": 20,       "source": "stated" },
-        { "id": "weighting",      "value": "equal",  "source": "default" },
-        { "id": "rebalance_freq", "value": "monthly","source": "stated" }
+        { "id": "universe",      "value": "<nifty50|nifty100|nifty500 — from strategy or answer>", "source": "stated" },
+        { "id": "n_picks",       "value": null, "source": "required" },
+        { "id": "rank_by",       "value": "<momentum|roe|roa|composite — from strategy or answer only>", "source": "stated" },
+        { "id": "weighting",     "value": "equal", "source": "default" },
+        { "id": "rebalance_freq","value": null, "source": "required" },
+        { "id": "min_ltp",       "value": null, "source": "optional" },
+        { "id": "min_mcap_cr",   "value": null, "source": "optional" }
       ]
     },
     {
-      "id": "execution",
-      "group": "Execution mechanics",
+      "id": "execution", "group": "Execution mechanics",
       "fields": [
-        { "id": "slippage",   "value": 0.1,            "source": "AI", "confidence": 0.9 },
+        { "id": "slippage",   "value": null, "source": "optional" },
         { "id": "brokerage",  "value": "zerodha_flat", "source": "default" },
-        { "id": "order_type", "value": "market_close", "source": "default" }
+        { "id": "order_type", "value": "market_close",  "source": "default" }
       ]
     },
     {
-      "id": "risk",
-      "group": "Risk controls",
+      "id": "screen", "group": "Screen filters",
       "fields": [
-        { "id": "stop_loss",    "value": null, "source": "optional" },
-        { "id": "position_cap", "value": null, "source": "optional" },
-        { "id": "sector_cap",   "value": null, "source": "optional" }
+        { "id": "max_pe",          "value": null, "source": "optional" },
+        { "id": "min_roe",         "value": null, "source": "optional" },
+        { "id": "max_de",          "value": null, "source": "optional" },
+        { "id": "min_roa",         "value": null, "source": "optional" },
+        { "id": "max_pb",          "value": null, "source": "optional" },
+        { "id": "min_rev_growth",  "value": null, "source": "optional" },
+        { "id": "momentum_months", "value": 12, "source": "AI" },
+        { "id": "ema_filter",      "value": null, "source": "optional" },
+        { "id": "ema_short",       "value": null, "source": "optional" },
+        { "id": "ema_medium",      "value": null, "source": "optional" },
+        { "id": "ema_long",        "value": null, "source": "optional" }
+      ]
+    },
+    {
+      "id": "risk", "group": "Risk controls",
+      "fields": [
+        { "id": "stop_loss",        "value": null, "source": "optional" },
+        { "id": "target_pct",       "value": null, "source": "optional" },
+        { "id": "max_holding_days", "value": null, "source": "optional" },
+        { "id": "position_cap",     "value": null, "source": "optional" },
+        { "id": "sector_cap",       "value": null, "source": "optional" }
       ]
     }
   ]
@@ -67,9 +85,11 @@ Respond with valid JSON:
 
 Rules:
 - Use citations like ["Q1","Q2"] when a bullet was shaped by an answer to that question.
-- Source tags: "stated" (user said it explicitly), "AI" (inferred), "required" (still missing), "default" (product default), "optional" (off by default).
-- "stated" takes priority when a user's answer resolves an ambiguity.
-- All answers tagged "source: default" mean the user skipped — use the AI default.
+- Source tags: "stated" (user said it explicitly), "AI" (clearly inferable from strategy), "required" (still missing — leave null), "optional" (not in strategy — leave null).
+- NEVER fill a value that was not answered and is not clearly stated in the original strategy. If it is still missing, set source "required" and value null.
+- rank_by MUST come from the strategy or a user answer. NEVER default it to "momentum" or any other value on your own.
+- ema_filter, ema_short, ema_medium, ema_long — set ONLY if the strategy or answers specify EMA conditions.
+- min_ltp, min_mcap_cr — set ONLY if the strategy or answers explicitly state a minimum price or market cap.
 - Indian conventions: ₹, lakh/crore, NSE only.
 
 Respond ONLY with the JSON object. No preamble, no markdown fences.`;
@@ -80,18 +100,25 @@ function defaultParameters(): ParameterBlock[] {
       id: 'money_timeline', group: 'Money & timeline',
       fields: [
         { id: 'capital',        label: 'Capital',        type: 'currency', value: 1000000,   source: 'default', required: false, unit: '₹' },
-        { id: 'backtest_start', label: 'Backtest start', type: 'date',     value: '2020-01-01', source: 'AI',   required: false, confidence: 0.8 },
-        { id: 'backtest_end',   label: 'Backtest end',   type: 'date',     value: null,       source: 'required', required: true },
+        { id: 'run_capital',    label: 'Run capital',    type: 'currency', value: null,      source: 'required', required: true, unit: '₹', helpText: 'Amount committed to this strategy. Must be ≤ your total capital.' },
+        { id: 'backtest_start', label: 'Backtest start', type: 'date',     value: '2020-01-01', source: 'default', required: false },
+        { id: 'backtest_end',   label: 'Backtest end',   type: 'date',     value: '2024-12-31', source: 'default', required: false },
       ],
     },
     {
       id: 'selection', group: 'Selection rules',
       fields: [
-        { id: 'n_picks',       label: 'Number of picks (N)', type: 'number', value: 20,       source: 'AI',    required: false, confidence: 0.85 },
+        { id: 'universe',      label: 'Universe',            type: 'select', value: null,      source: 'required', required: true,
+          options: [{ value: 'nifty50', label: 'Nifty 50' }, { value: 'nifty100', label: 'Nifty 100' }, { value: 'nifty500', label: 'Nifty 500' }] },
+        { id: 'n_picks',       label: 'Number of picks (N)', type: 'number', value: null,      source: 'required', required: true },
+        { id: 'rank_by',       label: 'Rank by',             type: 'select', value: null,      source: 'required', required: true,
+          options: [{ value: 'momentum', label: 'Momentum' }, { value: 'roe', label: 'ROE' }, { value: 'roa', label: 'ROA' }, { value: 'composite', label: 'Composite score' }] },
         { id: 'weighting',     label: 'Weighting',           type: 'select', value: 'equal',  source: 'default', required: false,
           options: [{ value: 'equal', label: 'Equal weight' }, { value: 'marketcap', label: 'Market-cap weight' }, { value: 'score', label: 'Score weight' }] },
         { id: 'rebalance_freq',label: 'Rebalance frequency', type: 'select', value: 'monthly', source: 'AI',   required: false, confidence: 0.9,
           options: [{ value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' }] },
+        { id: 'min_ltp',       label: 'Min stock price (₹)', type: 'number', value: null,     source: 'optional', required: false },
+        { id: 'min_mcap_cr',   label: 'Min mkt cap (₹Cr)',   type: 'number', value: null,     source: 'optional', required: false },
       ],
     },
     {
@@ -105,11 +132,30 @@ function defaultParameters(): ParameterBlock[] {
       ],
     },
     {
+      id: 'screen', group: 'Screen filters',
+      fields: [
+        { id: 'max_pe',          label: 'Max P/E ratio',               type: 'number',  value: null, source: 'optional', required: false },
+        { id: 'min_roe',         label: 'Min ROE (%)',                 type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
+        { id: 'max_de',          label: 'Max Debt/Equity ratio',       type: 'number',  value: null, source: 'optional', required: false },
+        { id: 'min_roa',         label: 'Min ROA (%)',                 type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
+        { id: 'max_pb',          label: 'Max Price/Book ratio',        type: 'number',  value: null, source: 'optional', required: false },
+        { id: 'min_rev_growth',  label: 'Min Revenue growth (%)',      type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
+        { id: 'momentum_months', label: 'Momentum lookback (months)',  type: 'number',  value: 12,   source: 'AI',       required: false, confidence: 0.9 },
+        { id: 'ema_filter',      label: 'EMA trend filter',            type: 'select',  value: null, source: 'optional', required: false,
+          options: [{ value: 'bullish', label: 'Bullish (short & medium EMA above long)' }, { value: 'bearish', label: 'Bearish (short & medium EMA below long)' }] },
+        { id: 'ema_short',       label: 'EMA short period (days)',     type: 'number',  value: null, source: 'optional', required: false },
+        { id: 'ema_medium',      label: 'EMA medium period (days)',    type: 'number',  value: null, source: 'optional', required: false },
+        { id: 'ema_long',        label: 'EMA long period (days)',      type: 'number',  value: null, source: 'optional', required: false },
+      ],
+    },
+    {
       id: 'risk', group: 'Risk controls',
       fields: [
-        { id: 'stop_loss',    label: 'Stop loss per position', type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
-        { id: 'position_cap', label: 'Max position size',       type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
-        { id: 'sector_cap',   label: 'Max sector exposure',     type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
+        { id: 'stop_loss',         label: 'Stop loss per position', type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
+        { id: 'target_pct',        label: 'Profit target',           type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
+        { id: 'max_holding_days',  label: 'Max holding days',        type: 'number',  value: null, source: 'optional', required: false },
+        { id: 'position_cap',      label: 'Max position size',       type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
+        { id: 'sector_cap',        label: 'Max sector exposure',     type: 'percent', value: null, source: 'optional', required: false, unit: '%' },
       ],
     },
   ];
@@ -155,17 +201,10 @@ export async function POST(req: Request) {
 
     const answersText = formatAnswers(questions, answers);
 
-    /* Prompt caching: stable system prompt cached; dynamic content (input + answers) uncached */
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 8096,
-      system: [
-        {
-          type: 'text',
-          text: SYSTEM_PROMPT,
-          cache_control: { type: 'ephemeral' },
-        },
-      ],
+      max_tokens: 4096,
+      system: SYSTEM_PROMPT,
       messages: [
         {
           role: 'user',

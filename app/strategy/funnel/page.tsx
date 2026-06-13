@@ -8,6 +8,7 @@ import StepIndicator from '@/components/StepIndicator';
 import FunnelStageCard from '@/components/FunnelStageCard';
 import SelectionGrid from '@/components/SelectionGrid';
 import DisclaimerFooter from '@/components/DisclaimerFooter';
+import EliminationChart from '@/components/EliminationChart';
 import { getMarketStatus } from '@/lib/marketStatus';
 import { formatPrice, formatPct, formatMcap } from '@/lib/format';
 import type { FunnelStage, SelectionStock, ScreenerResult } from '@/lib/screener';
@@ -39,13 +40,28 @@ function readRunParams() {
   catch { return {}; }
 }
 
-interface BriefBullet { stage: string; text: string; }
+/* Honest universe label — never assume Nifty 100 for an unknown value. */
+const UNIVERSE_LABELS: Record<string, string> = {
+  nifty50: 'Nifty 50', nifty100: 'Nifty 100', nifty500: 'Nifty 500',
+};
+function fmtUniverse(u?: string): string {
+  return (u && UNIVERSE_LABELS[u]) || (u ?? '—');
+}
+
+interface BriefBullet { stage: string; text: string; citations?: string[]; }
 interface RunContext {
-  strategyIdea?: string;
-  briefBullets?: BriefBullet[];
-  confidence?:   string;
-  parsedAt?:     string;
-  nPicks?:       number;
+  strategyIdea?:   string;
+  sourceFile?:     string;
+  briefBullets?:   BriefBullet[];
+  confidence?:     string;
+  parsedAt?:       string;
+  nPicks?:         number;
+  universe?:       string;
+  rankBy?:         string;
+  runCapital?:     number;
+  stopLossPct?:    number;
+  targetPct?:      number;
+  maxHoldingDays?: number;
 }
 
 function StrategyContextBar({ ctx }: { ctx: RunContext }) {
@@ -76,6 +92,11 @@ function StrategyContextBar({ ctx }: { ctx: RunContext }) {
         {ctx.confidence && (
           <span style={{ fontSize: 10, color: confidenceColor, fontWeight: 600, marginRight: 6 }}>
             {ctx.confidence} confidence
+          </span>
+        )}
+        {ctx.universe && (
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)', marginRight: 6 }}>
+            {fmtUniverse(ctx.universe)}
           </span>
         )}
         {ctx.nPicks && (
@@ -142,6 +163,7 @@ export default function FunnelPage() {
   const [isRunning,   setIsRunning]   = useState(true);
   const [error,       setError]       = useState<string | null>(null);
   const [activeStage,    setActiveStage]    = useState<number>(5);
+  const [showElim,       setShowElim]       = useState(false);
   const [excluded,       setExcluded]       = useState<Set<string>>(new Set());
   const [verifiedStages,  setVerifiedStages]  = useState<Set<number>>(new Set());
   const [ruleOverrides,   setRuleOverrides]   = useState<Record<number, string>>({});
@@ -153,6 +175,7 @@ export default function FunnelPage() {
   const [showBtConfig,     setShowBtConfig]     = useState(false);
   const [btFrom,           setBtFrom]           = useState(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 3); return d.toISOString().slice(0, 10); });
   const [btTo,             setBtTo]             = useState(() => new Date().toISOString().slice(0, 10));
+  const [runCtx,           setRunCtx]           = useState<RunContext>({});
   const ruleInputRef = useRef<HTMLTextAreaElement>(null);
 
   const run = useCallback(async () => {
@@ -165,7 +188,7 @@ export default function FunnelPage() {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(params),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error((e as {error?:string}).error ?? `HTTP ${res.status}`); }
       const data: ScreenerResult = await res.json();
       setResult(data);
     } catch (e) {
@@ -175,7 +198,8 @@ export default function FunnelPage() {
     }
   }, []);
 
-  useEffect(() => { run(); }, [run]);
+  useEffect(() => { setRunCtx(readRunParams() as RunContext); run(); }, [run]);
+  useEffect(() => { setShowElim(false); }, [activeStage]);
 
   const activeStageData: FunnelStage | undefined = result?.stages.find((s) => s.index === activeStage);
   const universeCount = result?.stages[0]?.count ?? 0;
@@ -218,12 +242,12 @@ export default function FunnelPage() {
 
   const handleSaveStrategy = () => {
     if (!result) return;
-    const params = readRunParams();
+    const params = runCtx;
     const saves = JSON.parse(localStorage.getItem('af_saved_strategies') ?? '[]') as SavedStrategy[];
     const entry: SavedStrategy = {
       id:        Date.now(),
       savedAt:   new Date().toISOString(),
-      params,
+      params:    params as Record<string, unknown>,
       selection: result.selection.map((s) => s.symbol),
       stageCount: result.stages.length,
     };
@@ -270,6 +294,118 @@ export default function FunnelPage() {
     router.push('/strategy/compare');
   };
 
+  const [tradeDeskMsg, setTradeDeskMsg] = useState<string | null>(null);
+  const [runCapitalInput, setRunCapitalInput] = useState<string>('');
+  // When the same strategy already has a run, hold the pending create body + the
+  // existing match so the user can choose Open existing / Create new / Cancel.
+  const [dupPrompt, setDupPrompt] = useState<
+    { match: { runId: string; total: number; live: number }; body: object; pickCount: number } | null
+  >(null);
+
+  /* Seed the run-capital input from parsed params once they load (no silent default —
+     if the strategy didn't capture run_capital, the field stays empty for explicit entry). */
+  useEffect(() => {
+    if (runCtx.runCapital && runCtx.runCapital > 0) setRunCapitalInput(String(runCtx.runCapital));
+  }, [runCtx.runCapital]);
+
+  const createRun = async (body: object, pickCount: number) => {
+    try {
+      const res = await fetch('/api/trade/runs/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error((e as { error?: string }).error ?? `HTTP ${res.status}`);
+      }
+      const { runId } = await res.json();
+      window.open(`/trade/run/${runId}`, '_blank');
+      setTradeDeskMsg(`Sent ${pickCount} ticket${pickCount === 1 ? '' : 's'} to Trade Desk`);
+      setTimeout(() => setTradeDeskMsg(null), 3000);
+    } catch (e) {
+      setTradeDeskMsg(`Failed: ${String(e instanceof Error ? e.message : e)}`);
+    }
+  };
+
+  const handleSendToTradeDesk = async () => {
+    if (!result) return;
+    setTradeDeskMsg(null);
+
+    const runCapital = Number(runCapitalInput);
+    if (!Number.isFinite(runCapital) || runCapital <= 0) {
+      setTradeDeskMsg('Enter run capital (₹) below before sending to Trade Desk.');
+      return;
+    }
+    /* Remember it for next time so the funnel/Trade Desk stay in sync. */
+    try {
+      sessionStorage.setItem('af_run_params', JSON.stringify({ ...runCtx, runCapital }));
+    } catch { /* sessionStorage unavailable — non-fatal */ }
+
+    const universeLabel = fmtUniverse(runCtx.universe);
+
+    const picks = result.selection
+      .filter((s) => !excluded.has(s.symbol))
+      .map((s) => {
+        const row = (result.stages.find((st) => st.name === 'Select')?.stocks ?? [])
+          .find((r) => r.symbol === s.symbol);
+        return {
+          symbol:         s.symbol + '.NS',
+          name:           s.name,
+          sector:         s.sector,
+          rank:           s.rank,
+          weight:         s.weight,
+          ltp:            row?.ltp ?? 0,
+          mcap_cr:        row?.mcapCr ?? 0,
+          pe:             row?.pe ?? null,
+          roe:            row?.roe ?? null,
+          headline_label: s.headlineMetric.label,
+          headline_value: s.headlineMetric.value,
+          rank_value:     row?.momentumPct ?? null,
+        };
+      });
+
+    if (picks.length === 0) {
+      setTradeDeskMsg('No stocks selected.');
+      return;
+    }
+
+    const body = {
+      run_capital:    runCapital,
+      rank_by:        runCtx.rankBy ?? result.params.rankBy,
+      universe_label: universeLabel,
+      strategy_idea:  runCtx.strategyIdea ?? '',
+      brief:          { bullets: runCtx.briefBullets ?? [] },
+      source_file:    runCtx.sourceFile ?? null,
+      picks,
+      exit_blueprint: {
+        target_pct:       runCtx.targetPct      ?? null,
+        stop_pct:         runCtx.stopLossPct    ?? null,
+        max_holding_days: runCtx.maxHoldingDays ?? null,
+      },
+    };
+
+    // Does this exact strategy already have a Trade Desk run? If so, ask the user.
+    try {
+      const m = await fetch('/api/trade/runs/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategy_idea:  body.strategy_idea,
+          universe_label: body.universe_label,
+          rank_by:        body.rank_by,
+        }),
+      });
+      const { match } = await m.json();
+      if (match && match.total > 0) {
+        setDupPrompt({ match, body, pickCount: picks.length });
+        return;
+      }
+    } catch { /* match check failed — fall through to create */ }
+
+    await createRun(body, picks.length);
+  };
+
   return (
     <div className={styles.page}>
       <GlobalNav marketStatus={getMarketStatus().status} marketStatusTime={new Date().toISOString()} marketStatusReason={getMarketStatus().reason} />
@@ -279,9 +415,22 @@ export default function FunnelPage() {
         <div className={styles.pageHeader}>
           <div>
             <h1 className={styles.title}>Strategy run</h1>
-            <p className={styles.sub}>
-              Nifty 100 · Momentum quality screen · {result ? formatDate(result.asOf) : '…'}
-            </p>
+            {(() => {
+              const universeLabel = fmtUniverse(runCtx.universe);
+              const idea = runCtx.strategyIdea?.trim();
+              return (
+                <>
+                  {idea && (
+                    <p className={styles.sub} style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>
+                      {idea.length > 80 ? idea.slice(0, 80) + '…' : idea}
+                    </p>
+                  )}
+                  <p className={styles.sub}>
+                    {universeLabel} · {result ? formatDate(result.asOf) : '…'}
+                  </p>
+                </>
+              );
+            })()}
           </div>
           <div className={styles.headerActions}>
             <button className="btn btn--secondary btn--sm" onClick={run} disabled={isRunning}>
@@ -299,13 +448,16 @@ export default function FunnelPage() {
           <StepIndicator active={3} />
         </div>
 
-        <StrategyContextBar ctx={readRunParams() as RunContext} />
+        <StrategyContextBar ctx={runCtx} />
 
         {error && (
           <div className="banner banner--error" style={{ marginBottom: 12 }}>
             <IconAlertTriangle size={14} />
             {error}
-            <button className="btn btn--secondary btn--sm" style={{ marginLeft: 'auto' }} onClick={run}>Retry</button>
+            <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+              <button className="btn btn--secondary btn--sm" onClick={() => router.push('/strategy')}>← Back to configure</button>
+              <button className="btn btn--secondary btn--sm" onClick={run}>Retry</button>
+            </div>
           </div>
         )}
 
@@ -381,58 +533,123 @@ export default function FunnelPage() {
               </button>
             </div>
 
-            {/* Stocks table */}
-            {visibleStocks.length > 0 ? (
-              <div className={styles.tableWrap}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th></th>
-                      <th>Symbol</th>
-                      <th>Company</th>
-                      <th>Sector</th>
-                      <th className={styles.numCol}>LTP</th>
-                      <th className={styles.numCol}>Day chg %</th>
-                      <th className={styles.numCol}>Mkt cap</th>
-                      <th className={styles.numCol}>P/E</th>
-                      <th className={styles.numCol}>ROE %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleStocks.slice(0, 100).map((row) => {
-                      const { text, dir } = formatPct(row.changePct);
-                      const isExcluded = excluded.has(row.symbol);
-                      return (
-                        <tr key={row.symbol} className={isExcluded ? styles.rowExcluded : ''}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={!isExcluded}
-                              onChange={() => toggleExclude(row.symbol)}
-                              style={{ accentColor: 'var(--brand)', cursor: 'pointer' }}
-                            />
-                          </td>
-                          <td><span className={styles.symbolCell}>{row.symbol}</span></td>
-                          <td className={styles.nameCell}>{row.name}</td>
-                          <td>{row.sector}</td>
-                          <td className={styles.numCol + ' num'}>{formatPrice(row.ltp)}</td>
-                          <td className={styles.numCol + ' num ' + (dir === 'up' ? styles.up : dir === 'down' ? styles.down : '')}>{text}</td>
-                          <td className={styles.numCol + ' num'}>{row.mcapCr > 0 ? formatMcap(row.mcapCr) : '—'}</td>
-                          <td className={styles.numCol + ' num'}>{row.pe?.toFixed(1) ?? '—'}</td>
-                          <td className={styles.numCol + ' num'}>{row.roe != null ? `${row.roe.toFixed(1)}%` : '—'}</td>
+            {/* Pass / Eliminated tabs */}
+            {activeStageData.eliminated?.length > 0 && (
+              <div style={{ display: 'flex', gap: 1, marginBottom: 10, background: 'var(--bg-secondary)', borderRadius: 6, padding: 2, width: 'fit-content' }}>
+                <button className={'btn btn--sm ' + (!showElim ? 'btn--primary' : 'btn--ghost')} onClick={() => setShowElim(false)}>
+                  Passed ({activeStageData.name === 'Universe' ? activeStageData.count : activeStageData.stocks.length})
+                </button>
+                <button className={'btn btn--sm ' + (showElim ? 'btn--primary' : 'btn--ghost')} onClick={() => setShowElim(true)}>
+                  Eliminated ({activeStageData.eliminated.length})
+                </button>
+              </div>
+            )}
+
+            {/* Stocks table or eliminated view */}
+            {showElim ? (
+              <div>
+                {result?.params && (
+                  <div style={{ marginBottom: 14 }}>
+                    <EliminationChart stage={activeStageData} params={result.params} />
+                  </div>
+                )}
+                <div className={styles.tableWrap}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Symbol</th><th>Company</th><th>Sector</th>
+                        <th className={styles.numCol}>LTP</th>
+                        <th className={styles.numCol}>Mkt Cap</th>
+                        <th className={styles.numCol}>P/E</th>
+                        <th className={styles.numCol}>ROE %</th>
+                        <th>Reason eliminated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeStageData.eliminated.map(e => (
+                        <tr key={e.symbol}>
+                          <td><span className={styles.symbolCell}>{e.symbol}</span></td>
+                          <td className={styles.nameCell}>{e.name}</td>
+                          <td>{e.sector}</td>
+                          <td className={styles.numCol + ' num'}>{e.ltp != null ? formatPrice(e.ltp) : '—'}</td>
+                          <td className={styles.numCol + ' num'}>{e.mcapCr != null && e.mcapCr > 0 ? formatMcap(e.mcapCr) : '—'}</td>
+                          <td className={styles.numCol + ' num'}>{e.pe?.toFixed(1) ?? '—'}</td>
+                          <td className={styles.numCol + ' num'}>{e.roe != null ? `${e.roe.toFixed(1)}%` : '—'}</td>
+                          <td style={{ fontSize: 11, color: 'var(--down)' }}>{e.reason}</td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            ) : activeStageData?.name === 'Universe' ? (
-              <div className={styles.emptyStage}>
-                <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
-                  {activeStageData.count} stocks in universe — individual rows not shown at this stage.
-                  <br />Click Stage 2 (Eligibility) to see individual stocks.
-                </p>
-              </div>
+            ) : activeStageData.stocks.length > 0 ? (
+              (() => {
+                const rankBy = result?.params.rankBy;
+                const isRankedStage = activeStageData.index >= 4;
+                const hasScores = isRankedStage && activeStageData.stocks.some((s) => s.score != null);
+                const scoreLabel =
+                  rankBy === 'composite' ? 'Score'
+                  : rankBy === 'roe'     ? 'ROE %'
+                  : rankBy === 'roa'     ? 'ROA %'
+                  :                        'Momentum';
+                const formatScore = (row: (typeof activeStageData.stocks)[0]) => {
+                  if (row.score == null) return '—';
+                  if (rankBy === 'composite') return row.score.toFixed(1);
+                  if (rankBy === 'momentum')  return `${row.score >= 0 ? '+' : ''}${row.score.toFixed(1)}%`;
+                  return `${row.score.toFixed(1)}%`;
+                };
+                return (
+                  <div className={styles.tableWrap}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th></th>
+                          <th>Symbol</th>
+                          <th>Company</th>
+                          <th>Sector</th>
+                          <th className={styles.numCol}>LTP</th>
+                          <th className={styles.numCol}>Day chg %</th>
+                          <th className={styles.numCol}>Mkt cap</th>
+                          <th className={styles.numCol}>P/E</th>
+                          <th className={styles.numCol}>ROE %</th>
+                          {hasScores && <th className={styles.numCol} style={{ color: 'var(--brand)' }}>{scoreLabel}</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {activeStageData.stocks.slice(0, 100).map((row) => {
+                          const { text, dir } = formatPct(row.changePct);
+                          const isExcluded = excluded.has(row.symbol);
+                          return (
+                            <tr key={row.symbol} className={isExcluded ? styles.rowExcluded : ''}>
+                              <td>
+                                <input
+                                  type="checkbox"
+                                  checked={!isExcluded}
+                                  onChange={() => toggleExclude(row.symbol)}
+                                  style={{ accentColor: 'var(--brand)', cursor: 'pointer' }}
+                                />
+                              </td>
+                              <td><span className={styles.symbolCell}>{row.symbol}</span></td>
+                              <td className={styles.nameCell}>{row.name}</td>
+                              <td>{row.sector}</td>
+                              <td className={styles.numCol + ' num'}>{formatPrice(row.ltp)}</td>
+                              <td className={styles.numCol + ' num ' + (dir === 'up' ? styles.up : dir === 'down' ? styles.down : '')}>{text}</td>
+                              <td className={styles.numCol + ' num'}>{row.mcapCr > 0 ? formatMcap(row.mcapCr) : '—'}</td>
+                              <td className={styles.numCol + ' num'}>{row.pe?.toFixed(1) ?? '—'}</td>
+                              <td className={styles.numCol + ' num'}>{row.roe != null ? `${row.roe.toFixed(1)}%` : '—'}</td>
+                              {hasScores && (
+                                <td className={styles.numCol + ' num'} style={{ color: 'var(--brand)', fontWeight: 600 }}>
+                                  {formatScore(row)}
+                                </td>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()
             ) : (
               <div className={styles.emptyStage}>
                 <IconAlertTriangle size={20} color="var(--caution)" />
@@ -501,7 +718,63 @@ export default function FunnelPage() {
                 <IconArrowsLeftRight size={14} />
                 Add strategy B and compare
               </button>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-caption)', color: 'var(--text-secondary)' }}>
+                Run capital ₹
+                <input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  placeholder="e.g. 100000"
+                  value={runCapitalInput}
+                  onChange={(e) => setRunCapitalInput(e.target.value)}
+                  style={{ width: 110, padding: '5px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-secondary)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 'var(--text-caption)' }}
+                />
+              </label>
+              <button className="btn btn--primary btn--md" onClick={handleSendToTradeDesk}>
+                <IconBolt size={14} />
+                Send to Trade Desk
+              </button>
             </div>
+            {tradeDeskMsg && (
+              <div style={{ marginTop: 8, fontSize: 12, color: tradeDeskMsg.startsWith('Failed') ? 'var(--down)' : 'var(--up-dark)' }}>
+                {tradeDeskMsg}
+              </div>
+            )}
+
+            {dupPrompt && (
+              <div
+                style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'grid', placeItems: 'center', zIndex: 50 }}
+                onClick={() => setDupPrompt(null)}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ background: 'var(--bg-primary)', border: '0.5px solid var(--border-tertiary)', borderRadius: 'var(--radius-lg)', padding: 24, maxWidth: 440, width: '90%' }}
+                >
+                  <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>This strategy already has a Trade Desk run</h3>
+                  <p style={{ margin: '0 0 16px', fontSize: 13, color: 'var(--text-secondary)' }}>
+                    {dupPrompt.match.live > 0
+                      ? <>It has <strong>{dupPrompt.match.live}</strong> live position{dupPrompt.match.live === 1 ? '' : 's'} ({dupPrompt.match.total} ticket{dupPrompt.match.total === 1 ? '' : 's'} total). </>
+                      : <>It has <strong>{dupPrompt.match.total}</strong> ticket{dupPrompt.match.total === 1 ? '' : 's'}. </>}
+                    Open the existing run, or create a new independent one?
+                  </p>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <button className="btn btn--ghost btn--sm" onClick={() => setDupPrompt(null)}>Cancel</button>
+                    <button
+                      className="btn btn--secondary btn--sm"
+                      onClick={() => { const d = dupPrompt; setDupPrompt(null); createRun(d.body, d.pickCount); }}
+                    >
+                      Create new run
+                    </button>
+                    <button
+                      className="btn btn--primary btn--sm"
+                      onClick={() => { window.open(`/trade/run/${dupPrompt.match.runId}`, '_blank'); setDupPrompt(null); }}
+                    >
+                      Open existing
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {showBtConfig && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--bg-primary)', border: '0.5px solid var(--border-tertiary)', borderRadius: 'var(--radius-lg)', flexWrap: 'wrap' }}>
